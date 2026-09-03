@@ -15,6 +15,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { ResizeMode, Video as ExpoVideo } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
@@ -27,7 +28,7 @@ import colors from '@/constants/colors';
 type IconName = React.ComponentProps<typeof Feather>['name'];
 type NavKey = 'home' | 'discover' | 'create' | 'inbox' | 'profile';
 
-type Video = {
+type FeedVideo = {
   id: string;
   creator: string;
   handle: string;
@@ -37,6 +38,7 @@ type Video = {
   comments: number;
   accent: string;
   image: ImageSourcePropType;
+  videoUrl: string;
 };
 
 type Comment = {
@@ -45,7 +47,7 @@ type Comment = {
   text: string;
 };
 
-const initialVideos: Video[] = [
+const initialVideos: FeedVideo[] = [
   {
     id: 'canyon',
     creator: 'Maya N.',
@@ -56,6 +58,7 @@ const initialVideos: Video[] = [
     comments: 284,
     accent: '#FF6B57',
     image: require('@/assets/images/canyon.jpg'),
+    videoUrl: 'https://media.w3.org/2010/05/sintel/trailer.mp4',
   },
   {
     id: 'vase',
@@ -67,6 +70,7 @@ const initialVideos: Video[] = [
     comments: 126,
     accent: '#29D3C2',
     image: require('@/assets/images/vase.jpg'),
+    videoUrl: 'https://media.w3.org/2010/05/bunny/trailer.mp4',
   },
   {
     id: 'seoul',
@@ -78,6 +82,7 @@ const initialVideos: Video[] = [
     comments: 512,
     accent: '#8F7CFF',
     image: require('@/assets/images/seoul.jpg'),
+    videoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
   },
 ];
 
@@ -195,7 +200,7 @@ function VideoCard({
   onShare,
   onTogglePlayback,
 }: {
-  video: Video;
+  video: FeedVideo;
   isActive: boolean;
   isLiked: boolean;
   isSaved: boolean;
@@ -207,29 +212,46 @@ function VideoCard({
   onShare: () => void;
   onTogglePlayback: () => void;
 }) {
+  const videoRef = useRef<ExpoVideo | null>(null);
   const [playing, setPlaying] = useState(true);
   const [progress, setProgress] = useState(0.35);
-
-  useEffect(() => {
-    if (!isActive || !playing) return;
-    const timer = setInterval(() => {
-      setProgress((current) => (current >= 1 ? 0 : current + 0.012));
-    }, 100);
-    return () => clearInterval(timer);
-  }, [isActive, playing]);
 
   useEffect(() => {
     if (!isActive) setProgress(0.35);
   }, [isActive]);
 
   const toggle = () => {
+    if (playing) {
+      void videoRef.current?.pauseAsync();
+    } else {
+      void videoRef.current?.playAsync();
+    }
     setPlaying((current) => !current);
     onTogglePlayback();
   };
 
   return (
     <Pressable onPress={toggle} style={styles.videoCard}>
-      <Image source={video.image} style={StyleSheet.absoluteFill} contentFit="cover" transition={300} />
+      <ExpoVideo
+        ref={videoRef}
+        source={{ uri: video.videoUrl }}
+        style={StyleSheet.absoluteFill}
+        shouldPlay={true}
+        isLooping={true}
+        isMuted={true}
+        resizeMode={ResizeMode.COVER}
+        useNativeControls={false}
+        posterSource={video.image}
+        usePoster
+        onPlaybackStatusUpdate={(status) => {
+          if (status.isLoaded) {
+            setPlaying(status.isPlaying);
+            if (status.durationMillis) {
+              setProgress(status.positionMillis / status.durationMillis);
+            }
+          }
+        }}
+      />
       <LinearGradient
         colors={['rgba(6, 10, 24, 0.6)', 'transparent', 'rgba(6, 10, 24, 0.85)']}
         locations={[0, 0.42, 1]}
@@ -406,18 +428,18 @@ function SimpleView({
 export default function HomeScreen() {
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const listRef = useRef<FlatList<Video>>(null);
+  const listRef = useRef<FlatList<FeedVideo>>(null);
   const topInset = insets.top + (Platform.OS === 'web' ? 67 : 0);
   const bottomInset = insets.bottom + (Platform.OS === 'web' ? 34 : 0);
   const [activeNav, setActiveNav] = useState<NavKey>('home');
   const [activeIndex, setActiveIndex] = useState(0);
   const [feedMode, setFeedMode] = useState<'For You' | 'Following'>('For You');
-  const [videos, setVideos] = useState<Video[]>(initialVideos);
+  const [videos, setVideos] = useState<FeedVideo[]>(initialVideos);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [following, setFollowing] = useState<Set<string>>(new Set());
   const [comments, setComments] = useState<Record<string, Comment[]>>(starterComments);
-  const [commentsVideo, setCommentsVideo] = useState<Video | null>(null);
+  const [commentsVideo, setCommentsVideo] = useState<FeedVideo | null>(null);
   const [commentText, setCommentText] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -461,7 +483,7 @@ export default function HomeScreen() {
     if (activeIndex >= visibleVideos.length) setActiveIndex(0);
   }, [activeIndex, visibleVideos.length]);
 
-  const onShare = async (video: Video) => {
+  const onShare = async (video: FeedVideo) => {
     await Share.share({ message: `${video.creator} on Loop: ${video.caption}` });
   };
 
@@ -476,7 +498,7 @@ export default function HomeScreen() {
       allowsEditing: false,
     });
     if (!result.canceled && result.assets[0]?.uri) {
-      const newVideo: Video = {
+      const newVideo: FeedVideo = {
         id: `clip-${Date.now()}`,
         creator: 'Aarav',
         handle: '@aarav.creates',
@@ -486,6 +508,7 @@ export default function HomeScreen() {
         comments: 0,
         accent: colors.light.primary,
         image: { uri: result.assets[0].uri },
+        videoUrl: result.assets[0].uri,
       };
       setVideos((current) => [newVideo, ...current]);
       setActiveIndex(0);
