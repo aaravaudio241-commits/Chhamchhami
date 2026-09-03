@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/"
+title = "Short Video App"
+description = "A mobile short-video app with a swipe-first feed, immersive playback, creator profiles, and lightweight social interactions designed for discovering and sharing quick videos."
+version = "1.0.0"
+id = "artifacts/short-video-app"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/" ]
+localPort = 19030
+
+[services.development]
+run = "pnpm --filter @workspace/short-video-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/short-video-app", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/short-video-app", "run", "serve" ]
+
+[services.env]
+PORT = "19030"
+BASE_PATH = "/"
