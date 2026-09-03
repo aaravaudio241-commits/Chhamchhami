@@ -58,7 +58,7 @@ const initialVideos: FeedVideo[] = [
     comments: 284,
     accent: '#FF6B57',
     image: require('@/assets/images/canyon.jpg'),
-    videoUrl: 'https://media.w3.org/2010/05/sintel/trailer.mp4',
+    videoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
   },
   {
     id: 'vase',
@@ -70,7 +70,7 @@ const initialVideos: FeedVideo[] = [
     comments: 126,
     accent: '#29D3C2',
     image: require('@/assets/images/vase.jpg'),
-    videoUrl: 'https://media.w3.org/2010/05/bunny/trailer.mp4',
+    videoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
   },
   {
     id: 'seoul',
@@ -215,6 +215,7 @@ function VideoCard({
   const videoRef = useRef<ExpoVideo | null>(null);
   const [playing, setPlaying] = useState(true);
   const [progress, setProgress] = useState(0.35);
+  const [videoFailed, setVideoFailed] = useState(false);
 
   useEffect(() => {
     if (!isActive) setProgress(0.35);
@@ -232,26 +233,31 @@ function VideoCard({
 
   return (
     <Pressable onPress={toggle} style={styles.videoCard}>
-      <ExpoVideo
-        ref={videoRef}
-        source={{ uri: video.videoUrl }}
-        style={StyleSheet.absoluteFill}
-        shouldPlay={true}
-        isLooping={true}
-        isMuted={true}
-        resizeMode={ResizeMode.COVER}
-        useNativeControls={false}
-        posterSource={video.image}
-        usePoster
-        onPlaybackStatusUpdate={(status) => {
-          if (status.isLoaded) {
-            setPlaying(status.isPlaying);
-            if (status.durationMillis) {
-              setProgress(status.positionMillis / status.durationMillis);
+      {isActive && !videoFailed ? (
+        <ExpoVideo
+          ref={videoRef}
+          source={{ uri: video.videoUrl }}
+          style={StyleSheet.absoluteFill}
+          shouldPlay={true}
+          isLooping={true}
+          isMuted={true}
+          resizeMode={ResizeMode.COVER}
+          useNativeControls={false}
+          posterSource={video.image}
+          usePoster
+          onError={() => setVideoFailed(true)}
+          onPlaybackStatusUpdate={(status) => {
+            if (status.isLoaded) {
+              setPlaying(status.isPlaying);
+              if (status.durationMillis) {
+                setProgress(status.positionMillis / status.durationMillis);
+              }
             }
-          }
-        }}
-      />
+          }}
+        />
+      ) : (
+        <Image source={video.image} style={StyleSheet.absoluteFill} contentFit="cover" />
+      )}
       <LinearGradient
         colors={['rgba(6, 10, 24, 0.6)', 'transparent', 'rgba(6, 10, 24, 0.85)']}
         locations={[0, 0.42, 1]}

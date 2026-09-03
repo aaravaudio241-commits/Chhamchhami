@@ -28,7 +28,7 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
+  useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -36,12 +36,10 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      void SplashScreen.hideAsync().catch(() => undefined);
-    }
-  }, [fontsLoaded, fontError]);
-
-  if (!fontsLoaded && !fontError) return null;
+    // Never block the first screen on network font loading. Inter will apply
+    // when available, while the system font keeps the feed usable immediately.
+    void SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
 
   return (
     <SafeAreaProvider>
