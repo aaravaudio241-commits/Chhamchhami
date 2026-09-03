@@ -7,6 +7,10 @@
     "icon": "./assets/images/icon.png",
     "scheme": "chhamchhami",
     "userInterfaceStyle": "automatic",
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.chhamchhami.app"
