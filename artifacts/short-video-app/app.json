@@ -1,20 +1,25 @@
 {
   "expo": {
-    "name": "Short Video App",
-    "slug": "short-video-app",
+    "name": "Chhamchhami",
+    "slug": "chhamchhami",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "short-video-app",
+    "scheme": "chhamchhami",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.chhamchhami.app"
     },
-    "android": {},
+    "android": {
+      "package": "com.chhamchhami.app"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router"
+    ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
