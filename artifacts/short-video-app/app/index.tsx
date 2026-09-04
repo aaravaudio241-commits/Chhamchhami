@@ -217,9 +217,33 @@ function VideoCard({
     videoPlayer.muted = true;
     videoPlayer.timeUpdateEventInterval = 0.25;
   });
+  const playerRef = useRef<typeof player | null>(player);
+  const playerReleasedRef = useRef(false);
   const [playing, setPlaying] = useState(isPlaying);
   const [progress, setProgress] = useState(0.35);
   const [videoFailed, setVideoFailed] = useState(false);
+
+  const pausePlayerSafely = () => {
+    const currentPlayer = playerRef.current;
+    if (!currentPlayer || playerReleasedRef.current) return;
+
+    try {
+      currentPlayer.pause();
+    } catch {
+      playerReleasedRef.current = true;
+      playerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    playerRef.current = player;
+    playerReleasedRef.current = false;
+
+    return () => {
+      playerReleasedRef.current = true;
+      playerRef.current = null;
+    };
+  }, [player]);
 
   useEffect(() => {
     const playingSubscription = player.addListener('playingChange', ({ isPlaying: nextIsPlaying }) => {
@@ -242,22 +266,25 @@ function VideoCard({
   }, [player]);
 
   useEffect(() => {
+    playerReleasedRef.current = false;
+
     if (isPlaying && !videoFailed) {
       player.play();
     } else {
-      player.pause();
+      pausePlayerSafely();
       setPlaying(false);
       setProgress(0.35);
     }
 
     return () => {
-      player.pause();
+      playerReleasedRef.current = true;
+      pausePlayerSafely();
     };
   }, [isPlaying, player, videoFailed]);
 
   const toggle = () => {
     if (playing) {
-      player.pause();
+      pausePlayerSafely();
     } else {
       player.play();
     }
