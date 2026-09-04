@@ -12,18 +12,17 @@ import {
   Text,
   TextInput,
   View,
-  ViewToken,
   useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { ResizeMode, Video as ExpoVideo } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { ImageSourcePropType } from 'react-native';
+import type { ImageSourcePropType, ViewToken } from 'react-native';
 import colors from '@/constants/colors';
 
 type IconName = React.ComponentProps<typeof Feather>['name'];
@@ -213,30 +212,54 @@ function VideoCard({
   onShare: () => void;
   onTogglePlayback: () => void;
 }) {
-  const videoRef = useRef<ExpoVideo | null>(null);
+  const player = useVideoPlayer(video.videoUrl, (videoPlayer) => {
+    videoPlayer.loop = true;
+    videoPlayer.muted = true;
+    videoPlayer.timeUpdateEventInterval = 0.25;
+  });
   const [playing, setPlaying] = useState(isPlaying);
   const [progress, setProgress] = useState(0.35);
   const [videoFailed, setVideoFailed] = useState(false);
 
   useEffect(() => {
-    setPlaying(isPlaying);
-    if (isPlaying) {
-      if (!videoFailed) void videoRef.current?.playAsync();
+    const playingSubscription = player.addListener('playingChange', ({ isPlaying: nextIsPlaying }) => {
+      setPlaying(nextIsPlaying);
+    });
+    const timeUpdateSubscription = player.addListener('timeUpdate', ({ currentTime }) => {
+      if (player.duration > 0) {
+        setProgress(currentTime / player.duration);
+      }
+    });
+    const statusSubscription = player.addListener('statusChange', ({ status }) => {
+      if (status === 'error') setVideoFailed(true);
+    });
+
+    return () => {
+      playingSubscription.remove();
+      timeUpdateSubscription.remove();
+      statusSubscription.remove();
+    };
+  }, [player]);
+
+  useEffect(() => {
+    if (isPlaying && !videoFailed) {
+      player.play();
     } else {
-      void videoRef.current?.pauseAsync();
+      player.pause();
+      setPlaying(false);
       setProgress(0.35);
     }
 
     return () => {
-      void videoRef.current?.pauseAsync();
+      player.pause();
     };
-  }, [isPlaying, videoFailed]);
+  }, [isPlaying, player, videoFailed]);
 
   const toggle = () => {
     if (playing) {
-      void videoRef.current?.pauseAsync();
+      player.pause();
     } else {
-      void videoRef.current?.playAsync();
+      player.play();
     }
     setPlaying((current) => !current);
     onTogglePlayback();
@@ -245,27 +268,16 @@ function VideoCard({
   return (
     <Pressable onPress={toggle} style={styles.videoCard}>
       {isPlaying && !videoFailed ? (
-        <ExpoVideo
-          ref={videoRef}
-          source={{ uri: video.videoUrl }}
-          style={StyleSheet.absoluteFill}
-          shouldPlay={isPlaying}
-          isLooping={true}
-          isMuted={true}
-          resizeMode={ResizeMode.COVER}
-          useNativeControls={false}
-          posterSource={video.image}
-          usePoster
-          onError={() => setVideoFailed(true)}
-          onPlaybackStatusUpdate={(status) => {
-            if (status.isLoaded) {
-              setPlaying(status.isPlaying);
-              if (status.durationMillis) {
-                setProgress(status.positionMillis / status.durationMillis);
-              }
-            }
-          }}
-        />
+        <>
+          <Image source={video.image} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            nativeControls={false}
+            contentFit="cover"
+            crossOrigin="anonymous"
+          />
+        </>
       ) : (
         <Image source={video.image} style={StyleSheet.absoluteFill} contentFit="cover" />
       )}
