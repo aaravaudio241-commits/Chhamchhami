@@ -12,6 +12,7 @@ import {
   Text,
   TextInput,
   View,
+  ViewToken,
   useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -189,7 +190,7 @@ function BottomNav({
 
 function VideoCard({
   video,
-  isActive,
+  isPlaying,
   isLiked,
   isSaved,
   isFollowing,
@@ -201,7 +202,7 @@ function VideoCard({
   onTogglePlayback,
 }: {
   video: FeedVideo;
-  isActive: boolean;
+  isPlaying: boolean;
   isLiked: boolean;
   isSaved: boolean;
   isFollowing: boolean;
@@ -213,13 +214,23 @@ function VideoCard({
   onTogglePlayback: () => void;
 }) {
   const videoRef = useRef<ExpoVideo | null>(null);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(isPlaying);
   const [progress, setProgress] = useState(0.35);
   const [videoFailed, setVideoFailed] = useState(false);
 
   useEffect(() => {
-    if (!isActive) setProgress(0.35);
-  }, [isActive]);
+    setPlaying(isPlaying);
+    if (isPlaying) {
+      if (!videoFailed) void videoRef.current?.playAsync();
+    } else {
+      void videoRef.current?.pauseAsync();
+      setProgress(0.35);
+    }
+
+    return () => {
+      void videoRef.current?.pauseAsync();
+    };
+  }, [isPlaying, videoFailed]);
 
   const toggle = () => {
     if (playing) {
@@ -233,12 +244,12 @@ function VideoCard({
 
   return (
     <Pressable onPress={toggle} style={styles.videoCard}>
-      {isActive && !videoFailed ? (
+      {isPlaying && !videoFailed ? (
         <ExpoVideo
           ref={videoRef}
           source={{ uri: video.videoUrl }}
           style={StyleSheet.absoluteFill}
-          shouldPlay={true}
+          shouldPlay={isPlaying}
           isLooping={true}
           isMuted={true}
           resizeMode={ResizeMode.COVER}
@@ -264,7 +275,7 @@ function VideoCard({
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.videoNoise} />
-      {!playing && isActive ? (
+      {!playing && isPlaying ? (
         <View style={styles.pausedBadge}>
           <Feather name="play" size={24} color={colors.light.foreground} fill={colors.light.foreground} />
         </View>
@@ -449,6 +460,19 @@ export default function HomeScreen() {
   const [commentText, setCommentText] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 80,
+    minimumViewTime: 100,
+  }).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const nextVisibleItem = viewableItems
+      .filter((item) => item.isViewable && item.index !== null)
+      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))[0];
+
+    if (nextVisibleItem?.index !== null && nextVisibleItem?.index !== undefined) {
+      setActiveIndex(nextVisibleItem.index);
+    }
+  }).current;
 
   useEffect(() => {
     Promise.all([
@@ -518,6 +542,9 @@ export default function HomeScreen() {
       };
       setVideos((current) => [newVideo, ...current]);
       setActiveIndex(0);
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      });
       setActiveNav('home');
       setCreateOpen(false);
       Alert.alert('Clip added', 'Your clip is now at the top of your local feed.');
@@ -535,10 +562,12 @@ export default function HomeScreen() {
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
         scrollEnabled={visibleVideos.length > 0}
+         viewabilityConfig={viewabilityConfig}
+         onViewableItemsChanged={onViewableItemsChanged}
         renderItem={({ item, index }) => (
           <VideoCard
             video={item}
-            isActive={index === activeIndex}
+             isPlaying={index === activeIndex}
             isLiked={liked.has(item.id)}
             isSaved={saved.has(item.id)}
             isFollowing={following.has(item.id)}
